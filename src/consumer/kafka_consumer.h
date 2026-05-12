@@ -74,7 +74,9 @@ public:
 
     // TODO: Signal the poll loop to stop gracefully
     // HINT: set a std::atomic<bool> flag, the poll loop checks it
-    void stop();
+    void stop() {
+        running_ = false;
+    }
 
     // TODO: Rebalance callback (static) — called by librdkafka on partition assign/revoke
     // FAANG INTERVIEW NOTE: "What happens to in-flight messages during a rebalance?"
