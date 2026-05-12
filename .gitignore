@@ -1,0 +1,63 @@
+# Build artifacts
+build/
+build-debug/
+cmake-build-*/
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+*.exe
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# Conan
+conan_toolchain.cmake
+conandeps.cmake
+conan.lock
+conanbuildinfo.*
+
+# Generated protobuf stubs
+scripts/_generated/
+ml_server/fraud_pb2.py
+ml_server/fraud_pb2_grpc.py
+
+# Trained model
+ml_server/model/*.joblib
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Locust output
+bench_results*
+
+# Grafana state
+grafana-data/

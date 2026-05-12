@@ -1,0 +1,1 @@
+. "/Users/prestonmamaril/fraud-detection-engine/conanbuildenv-release-armv8.sh"

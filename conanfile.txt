@@ -1,0 +1,25 @@
+[requires]
+# -----------------------------------------------------------------------------
+# Pinned versions — every dep is locked. Reproducible builds are non-negotiable.
+# Bumping any of these requires re-running benchmarks and re-validating SLOs.
+# -----------------------------------------------------------------------------
+librdkafka/2.3.0          # Kafka client (consumer + producer)
+hiredis/1.2.0             # Redis client (we wrap our own pool on top)
+grpc/1.54.3               # gRPC (transitively pulls protobuf, abseil, c-ares)
+protobuf/3.21.12          # Match what grpc/1.54.3 expects
+spdlog/1.13.0             # Structured logging
+nlohmann_json/3.11.3      # JSON for DLQ payload metadata
+prometheus-cpp/1.2.4      # Metrics exposition
+libpqxx/7.8.1             # Postgres client (DLQ flagged-tx audit log)
+gtest/1.14.0              # Unit tests
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[options]
+# Static-link C++ deps so the runtime image is self-contained and
+# we don't fight glibc/abi mismatches across debian/ubuntu base images.
+*:shared=False
+grpc/*:codegen=True       # we need the codegen plugin for cmake's protoc step
+protobuf/*:with_zlib=True

@@ -1,0 +1,83 @@
+// =============================================================================
+// proto/fraud.proto
+// =============================================================================
+// Shared schema for: Kafka transaction messages (binary-encoded payload)
+// AND the gRPC contract between the C++ engine and the Python ML server.
+//
+// Wire stability rule: NEVER renumber a field. NEVER reuse a tag. New fields
+// only get appended with new tag numbers — protobuf's forward-compat depends on it.
+// =============================================================================
+
+syntax = "proto3";
+
+package fraud;
+
+// -----------------------------------------------------------------------------
+// Transaction — produced to the `transactions` Kafka topic.
+// Lives on the wire as protobuf bytes (NOT JSON — saves ~5x bandwidth).
+// -----------------------------------------------------------------------------
+message Transaction {
+  string  tx_id           = 1;   // UUID v4
+  string  user_id         = 2;   // logical user identifier (key for Redis features)
+  string  merchant_id     = 3;
+  double  amount          = 4;   // in account currency, smallest unit (e.g. cents)
+  string  currency        = 5;   // ISO-4217: USD, EUR, ...
+  string  country         = 6;   // ISO-3166 alpha-2 country code of the POS
+  int64   timestamp_ms    = 7;   // unix epoch millis, UTC
+  string  card_bin        = 8;   // first 6 digits of card (NEVER full PAN — PCI scope!)
+  string  device_id       = 9;
+  string  ip_address      = 10;
+  PaymentMethod method    = 11;
+
+  enum PaymentMethod {
+    UNKNOWN = 0;
+    CARD    = 1;
+    ACH     = 2;
+    WIRE    = 3;
+    WALLET  = 4;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// UserFeatures — the enrichment data we pull from Redis and pass to the model.
+// Shipping it inside the gRPC request keeps the Python server stateless.
+// -----------------------------------------------------------------------------
+message UserFeatures {
+  int32   tx_count_30d    = 1;
+  double  avg_amount_30d  = 2;
+  string  countries_30d   = 3;   // CSV of ISO-3166 codes
+  int64   last_tx_ts_ms   = 4;
+  double  risk_score      = 5;   // pre-computed rolling baseline
+  bool    is_cache_miss   = 6;   // if true, features are zero-filled defaults
+}
+
+// -----------------------------------------------------------------------------
+// Scoring request/response
+// -----------------------------------------------------------------------------
+message ScoreRequest {
+  Transaction  transaction = 1;
+  UserFeatures features    = 2;
+}
+
+message ScoreResponse {
+  // 0.0 (clean) .. 1.0 (definite fraud). Threshold lives in the C++ engine config.
+  float  fraud_probability = 1;
+
+  // Optional model metadata — useful for A/B testing and shadow deploys.
+  string model_version     = 2;
+
+  // Server-side latency the model itself spent (us). Helps diagnose
+  // whether p99 issues are network or model-side.
+  int64  inference_us      = 3;
+}
+
+// -----------------------------------------------------------------------------
+// Service definition.
+// FAANG NOTE: One unary RPC, no streaming. We considered streaming but per-call
+// overhead (~30us) is dwarfed by model inference (~5-10ms), so streaming
+// would only matter if we batched on the server side — which would hurt
+// latency. Unary is the right call here.
+// -----------------------------------------------------------------------------
+service FraudService {
+  rpc Score(ScoreRequest) returns (ScoreResponse);
+}

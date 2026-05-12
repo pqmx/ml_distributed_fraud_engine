@@ -1,0 +1,2 @@
+# This directory holds the saved XGBoost model: xgb_model.joblib
+# Run scripts/train_model.py to populate it.
