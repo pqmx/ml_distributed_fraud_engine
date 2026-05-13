@@ -24,8 +24,8 @@
 #include <functional>
 #include <string>
 #include <atomic>
+#include "fraud.pb.h"
 
-struct Transaction; // forward declare from proto
 
 class KafkaConsumer {
 public:
@@ -39,15 +39,15 @@ public:
             char errstr[512];
 
             if (rd_kafka_conf_set(conf, "bootstrap.servers", brokers.c_str(), errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {
-                rd_kafka_conf_destroy(conf);   // YOU still own conf_ here
+                rd_kafka_conf_destroy(conf);
                 throw std::runtime_error(std::string("Kafka config error: ") + errstr);
             };
             if (rd_kafka_conf_set(conf, "group.id", group_id.c_str(), errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK){
-                rd_kafka_conf_destroy(conf);   // YOU still own conf_ here
+                rd_kafka_conf_destroy(conf);
                 throw std::runtime_error(std::string("Kafka config error: ") + errstr);
             }
             if (rd_kafka_conf_set(conf, "enable.auto.commit", "false", errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {
-                rd_kafka_conf_destroy(conf);   // YOU still own conf_ here
+                rd_kafka_conf_destroy(conf);
                 throw std::runtime_error(std::string("Kafka config error: ") + errstr);
             }
 
@@ -65,12 +65,38 @@ public:
 
     }
 
-    ~KafkaConsumer(); // TODO: rd_kafka_consumer_close, rd_kafka_destroy
+    ~KafkaConsumer() {
+        if (consumer_) {
+            rd_kafka_consumer_close(consumer_);
+            rd_kafka_destroy(consumer_);
+        }
+    }
 
     // TODO: Start the poll loop. Runs until stop() is called.
     // Each message: deserialize protobuf → call on_message callback → commit offset
     // HINT: rd_kafka_consumer_poll returns nullptr on timeout (not an error)
-    void start(std::function<void(Transaction)> on_message);
+    void start(std::function<void(fraud::Transaction)> on_message) {
+        running_ = true;
+        while (running_) {
+            rd_kafka_message_t* poll = rd_kafka_consumer_poll(consumer_, timeout_ms);
+            if (poll == nullptr) {
+                continue;
+            }
+
+            ScopeGuard destroy_guard{[poll] {
+                rd_kafka_message_destroy(poll);
+            }};
+            fraud::Transaction tx;
+            if (!tx.ParseFromArray(poll->payload, poll->len))
+                continue;
+
+
+            on_message(std::move(tx));
+
+            rd_kafka_commit_message(consumer_, poll, 0);
+
+        }
+    }
 
     // TODO: Signal the poll loop to stop gracefully
     // HINT: set a std::atomic<bool> flag, the poll loop checks it
@@ -81,10 +107,21 @@ public:
     // TODO: Rebalance callback (static) — called by librdkafka on partition assign/revoke
     // FAANG INTERVIEW NOTE: "What happens to in-flight messages during a rebalance?"
     static void rebalance_cb(rd_kafka_t*, rd_kafka_resp_err_t,
-                             rd_kafka_topic_partition_list_t*, void*);
+                             rd_kafka_topic_partition_list_t*, void*) {
+        
+    }
+
+    struct ScopeGuard {
+        std::function<void()> f;
+
+        ~ScopeGuard() {
+            if (f) f();
+        }
+    };
 
 private:
     rd_kafka_t* consumer_ = nullptr;
     std::atomic<bool> running_{false};
+    int timeout_ms = 100;
     // TODO: add any private members you need
 };
