@@ -94,8 +94,21 @@ public:
 
 private:
     // TODO: Acquire a connection from the pool, use it, return it
-    redisContext* acquire_connection();
-    void release_connection(redisContext* ctx);
+    redisContext* acquire_connection() {
+        pool_mutex_.lock();
+        if (pool_ == nullptr) {
+            return nullptr;
+        }
+
+        auto connection = pool_.back();
+        pool_.pop_back();
+        return connection;
+    }
+    void release_connection(redisContext* ctx) {
+        pool_mutex_.lock() {
+            
+        }
+    }
 
     std::vector<redisContext*> pool_;
     std::mutex pool_mutex_;
