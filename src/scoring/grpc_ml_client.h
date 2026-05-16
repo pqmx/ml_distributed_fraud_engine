@@ -10,7 +10,7 @@
 
 // NOTE: UserFeatures is defined in enrichment/redis_feature_store.h
 // Include that header in your .cpp, not just a forward declaration
-struct UserFeatures;
+#include "enrichment/redis_feature_store.h"
 
 class GrpcMlClient {
 public:
@@ -20,7 +20,27 @@ public:
         stub_ = fraud::FraudService::NewStub(channel);
     };
     // Returns nullopt on timeout or error — caller triggers circuit breaker
-    std::optional<float> score(const std::string& serialized_tx, const UserFeatures& features);
+    std::optional<float> score(const std::string& serialized_tx, const UserFeatures& features) {
+        fraud::ScoreRequest request;
+        request.mutable_transaction()->ParseFromString(serialized_tx);
+
+        auto* f = request.mutable_features();
+        f->set_tx_count_30d(features.tx_count_30d);
+        f->set_avg_amount_30d(features.avg_amount_30d);
+        f->set_countries_30d(features.countries_30d);
+        f->set_last_tx_ts_ms(features.last_tx_ts);
+        f->set_risk_score(features.risk_score);
+        f->set_is_cache_miss(features.is_cache_miss);
+        grpc::ClientContext context;
+        context.set_deadline(std::chrono::system_clock::now() + timeout_ms_);
+
+        fraud::ScoreResponse response;
+        stub_->Score(&context, request, &response);
+        grpc::Status status = stub_->Score(&context, request, &response);
+        if (status.ok())
+            return response.fraud_probability();
+        return std::nullopt;
+    };
 private:
     std::string server_address_;
     std::chrono::milliseconds timeout_ms_;
