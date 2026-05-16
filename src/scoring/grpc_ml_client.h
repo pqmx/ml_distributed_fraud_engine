@@ -35,7 +35,6 @@ public:
         context.set_deadline(std::chrono::system_clock::now() + timeout_ms_);
 
         fraud::ScoreResponse response;
-        stub_->Score(&context, request, &response);
         grpc::Status status = stub_->Score(&context, request, &response);
         if (status.ok())
             return response.fraud_probability();
