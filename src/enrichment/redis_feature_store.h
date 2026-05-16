@@ -95,19 +95,19 @@ public:
 private:
     // TODO: Acquire a connection from the pool, use it, return it
     redisContext* acquire_connection() {
-        pool_mutex_.lock();
-        if (pool_ == nullptr) {
+        std::lock_guard<std::mutex> lock(pool_mutex_);
+        if (pool_.empty()) {
             return nullptr;
         }
+
 
         auto connection = pool_.back();
         pool_.pop_back();
         return connection;
     }
     void release_connection(redisContext* ctx) {
-        pool_mutex_.lock() {
-            
-        }
+        std::lock_guard<std::mutex> lock(pool_mutex_);
+        pool_.push_back(ctx);
     }
 
     std::vector<redisContext*> pool_;
