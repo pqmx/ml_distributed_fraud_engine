@@ -95,15 +95,19 @@ public:
 
         redisReply* reply = (redisReply*)redisCommand(ctx, "HGETALL user:%s:features", user_id.c_str());
         if ( reply == nullptr) {
+            release_connection(ctx);
             throw std::runtime_error("Connection is broken");
+
         }
         if (reply->type == REDIS_REPLY_ARRAY && reply->elements == 0) {
             uf.is_cache_miss = true;
+            freeReplyObject(reply);
+            release_connection(ctx);
             return uf;
         }
         std::string field;
         std::string val;
-        for (size_t i; i < reply->elements; i+=2) {
+        for (size_t i = 0; i < reply->elements; i+=2) {
             field = reply->element[i]->str;
             val = reply->element[i + 1]->str;
 
