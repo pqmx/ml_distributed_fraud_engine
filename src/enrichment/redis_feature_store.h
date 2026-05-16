@@ -57,10 +57,30 @@ class RedisFeatureStore {
 public:
     // TODO: Constructor — create a pool of N hiredis connections
     // HINT: vector of redisContext*, protected by a mutex or connection pool pattern
-    explicit RedisFeatureStore(const std::string& host, int port,
-                                int pool_size = 8);
 
-    ~RedisFeatureStore(); // TODO: redisFree all connections
+    explicit RedisFeatureStore(const std::string& host, int port,
+                                int pool_size = 8) : host_(host), port_(port) {
+
+        pool_.reserve(pool_size);
+        for (int i = 0; i < pool_size; i++) {
+            redisContext* ctx = redisConnect(host.c_str(), port);
+            if (ctx == nullptr || ctx->err) {
+                for (auto* c : pool_) {
+                    redisFree(c);
+                }
+                if (ctx) redisFree(ctx);
+                throw std::runtime_error("Redis connection failed");
+            }
+
+            pool_.push_back(ctx);
+        }
+    }
+
+    ~RedisFeatureStore() {
+        for (auto* c : pool_) {
+            redisFree(c);
+        }
+    }// TODO: redisFree all connections
 
     // TODO: Fetch features for a single user_id
     // Use HGETALL. Return default UserFeatures on miss (is_cache_miss=true).

@@ -15,3 +15,7 @@
 #include <spdlog/spdlog.h>
 
 // TODO: implement all methods
+
+RedisFeatureStore::~RedisFeatureStore() {
+
+}
