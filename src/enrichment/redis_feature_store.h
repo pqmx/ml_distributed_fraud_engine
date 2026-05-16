@@ -43,6 +43,7 @@
 #include <optional>
 #include <mutex>
 #include <vector>
+#include <variant>
 
 struct UserFeatures {
     int tx_count_30d = 0;
@@ -98,13 +99,30 @@ public:
         }
         if (reply->type == REDIS_REPLY_ARRAY && reply->elements == 0) {
             uf.is_cache_miss = true;
+            return uf;
         }
-
+        std::string field;
+        std::string val;
         for (size_t i; i < reply->elements; i+=2) {
+            field = reply->element[i]->str;
+            val = reply->element[i + 1]->str;
 
+            if (field == "tx_count_30d") {
+                uf.tx_count_30d = std::stoi(val);
+            }else if (field == "avg_amount_30d"){
+                uf.avg_amount_30d = std::stof(val);
+            }else if (field == "countries_30d") {
+                uf.countries_30d = val;
+            }else if (field == "last_tx_ts") {
+                uf.last_tx_ts = std::stoll(val);
+            }else if (field == "risk_score") {
+                uf.risk_score = std::stof(val);
+            }
         }
-
-    }
+        freeReplyObject(reply);
+        release_connection(ctx);
+        return uf;
+};
 
     // TODO: Fetch features for multiple user_ids in a single pipeline round-trip
     // HINT: redisAppendCommand N times, then redisGetReply N times
