@@ -84,7 +84,27 @@ public:
 
     // TODO: Fetch features for a single user_id
     // Use HGETALL. Return default UserFeatures on miss (is_cache_miss=true).
-    UserFeatures get_features(const std::string& user_id);
+    UserFeatures get_features(const std::string& user_id) {
+        redisContext* ctx = acquire_connection();
+        UserFeatures uf;
+        if (ctx == nullptr) {
+            uf.is_cache_miss = true;
+            return uf;
+        }
+
+        redisReply* reply = (redisReply*)redisCommand(ctx, "HGETALL user:%s:features", user_id.c_str());
+        if ( reply == nullptr) {
+            throw std::runtime_error("Connection is broken");
+        }
+        if (reply->type == REDIS_REPLY_ARRAY && reply->elements == 0) {
+            uf.is_cache_miss = true;
+        }
+
+        for (size_t i; i < reply->elements; i+=2) {
+
+        }
+
+    }
 
     // TODO: Fetch features for multiple user_ids in a single pipeline round-trip
     // HINT: redisAppendCommand N times, then redisGetReply N times

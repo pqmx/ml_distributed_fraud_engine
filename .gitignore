@@ -29,6 +29,17 @@ conandeps.cmake
 conan.lock
 conanbuildinfo.*
 
+# Conan-generated CMake config files
+*Config.cmake
+*ConfigVersion.cmake
+*Targets.cmake
+*-config.cmake
+*-config-version.cmake
+*-Target-release.cmake
+*-release-armv8-data.cmake
+Find*.cmake
+.cmake/
+
 # Generated protobuf stubs
 scripts/_generated/
 ml_server/fraud_pb2.py
