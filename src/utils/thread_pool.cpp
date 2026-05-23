@@ -19,7 +19,7 @@ ThreadPool::ThreadPool(std::size_t n_threads, std::size_t max_queue_size)
         // Defensive default: 1 worker. Zero-thread pools are never what callers want.
         spdlog::warn("ThreadPool: n_threads=0 requested, using 1");
         n_threads = 1;
-    }
+    } 
 
     workers_.reserve(n_threads);
     for (std::size_t i = 0; i < n_threads; ++i) {

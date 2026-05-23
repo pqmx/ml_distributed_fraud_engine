@@ -34,14 +34,46 @@ public:
 
     // TODO: Returns true if the call should be allowed through
     // HINT: check current state; if OPEN, check if recovery_timeout has elapsed
-    bool allow_request();
+    // If elapsed → try CAS to HALF_OPEN, allow one trial request
+    bool allow_request() {
+        auto current = state_.load();
+
+        switch (current) {
+            case CircuitState::CLOSED:
+                return true;
+
+            case CircuitState::OPEN:
+               if ( std::chrono::steady_clock::now() - open_time_ >= recovery_timeout_) {
+                   auto expected = CircuitState::OPEN;
+                   if (state_.compare_exchange_strong(expected, CircuitState::HALF_OPEN))
+                       return true;
+               }
+        }
+        return false;
+    };
 
     // TODO: Record a successful call — reset failure count, transition to CLOSED
-    void record_success();
+    // HINT: if state is HALF_OPEN, CAS to CLOSED
+    void record_success() {
+            auto expected = CircuitState::HALF_OPEN;
+            state_.compare_exchange_strong(expected, CircuitState::CLOSED);
+    }
 
     // TODO: Record a failed call — increment failure count
     // If count >= threshold AND state is CLOSED → transition to OPEN, record open_time
-    void record_failure();
+    // If state is HALF_OPEN → reopen immediately
+    void record_failure() {
+        int prev = failure_count_.fetch_add(1);
+        if(prev + 1 >= failure_threshold_ && state_ == CircuitState::CLOSED) {
+            auto expected = CircuitState::CLOSED;
+            state_.compare_exchange_strong(expected, CircuitState::OPEN);
+            open_time_ = std::chrono::steady_clock::now();
+        }else if (state_ == CircuitState::HALF_OPEN) {
+            auto expected = CircuitState::HALF_OPEN;
+            state_.compare_exchange_strong(expected, CircuitState::OPEN);
+        }
+        failure_count_++;
+    }
 
     CircuitState state() const;
 
